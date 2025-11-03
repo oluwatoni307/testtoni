@@ -10,20 +10,21 @@ android {
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        // ✅ Use Java 17 for modern plugins
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
 
-        // 1.  ENABLE DESUGARING
+        // ✅ Enable desugaring
         isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
+        jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
     defaultConfig {
         applicationId = "com.example.test"
-        minSdk = flutter.minSdkVersion          // <= 25 needs desugaring
+        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -40,7 +41,7 @@ flutter {
     source = "../.."
 }
 
-// 2.  DEPENDENCY FOR DESUGARING
 dependencies {
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.3")
+    // ✅ Upgrade to the required version
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
