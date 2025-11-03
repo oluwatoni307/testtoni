@@ -1,0 +1,14 @@
+# codemagic.yaml  (free mac builder, no workspace block needed)
+workflows:
+  android-test:
+    name: Build APK & test
+
+    environment:
+      flutter: stable
+
+    scripts:
+      - flutter pub get
+      - flutter build apk --release
+
+    artifacts:
+      - build/app/outputs/flutter-apk/app-debug.apk
