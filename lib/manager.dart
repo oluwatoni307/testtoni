@@ -290,7 +290,7 @@ class NotificationManager {
         item.body,
         scheduled,
         details,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        androidScheduleMode: AndroidScheduleMode.exact,
         payload: item.id,
       );
 
@@ -347,7 +347,7 @@ class NotificationManager {
         item.body,
         scheduled,
         details,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        androidScheduleMode: AndroidScheduleMode.exact,
         matchDateTimeComponents: DateTimeComponents.time, // Repeat daily
         payload: item.id,
       );

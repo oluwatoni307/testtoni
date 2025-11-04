@@ -700,7 +700,7 @@ class _MyAppState extends State<MyApp> {
         title: 'One-Time Test',
         body: 'Fires in 3 minutes',
         source: NotificationSource.user,
-        oneTimeDate: now.add(const Duration(minutes: 3)),
+        oneTimeDate: now.add(const Duration(minutes: 1)),
         createdAt: now,
       );
 
