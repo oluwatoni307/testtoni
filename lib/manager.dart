@@ -26,6 +26,7 @@ class NotificationManager {
   final NotificationStorage _storage = NotificationStorage();
 
   bool _initialized = false;
+  Function(String?)? _onNotificationTap;
 
   // ============================================================================
   // INITIALIZATION
@@ -34,6 +35,8 @@ class NotificationManager {
   /// Initialize the notification system
   Future<void> initialize({Function(String?)? onNotificationTap}) async {
     if (_initialized) return;
+
+    _onNotificationTap = onNotificationTap;
 
     // Android initialization settings
     const androidSettings = AndroidInitializationSettings(
@@ -56,8 +59,8 @@ class NotificationManager {
     await _plugin.initialize(
       initSettings,
       onDidReceiveNotificationResponse: (details) {
-        if (onNotificationTap != null) {
-          onNotificationTap(details.payload);
+        if (_onNotificationTap != null) {
+          _onNotificationTap!(details.payload);
         }
       },
     );
@@ -66,6 +69,11 @@ class NotificationManager {
     await _createNotificationChannels();
 
     _initialized = true;
+  }
+
+  /// Update the notification tap callback without re-initializing
+  void updateTapCallback(Function(String?)? onNotificationTap) {
+    _onNotificationTap = onNotificationTap;
   }
 
   /// Create notification channels with different priorities

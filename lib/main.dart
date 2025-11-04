@@ -76,18 +76,16 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    // Re-initialize with tap counter
-    NotificationManager().initialize(
-      onNotificationTap: (p) {
-        setState(() {
-          _notificationTapCount++;
-        });
-        _showSnackBar(
-          '📬 Notification tapped! Count: $_notificationTapCount',
-          Colors.blue,
-        );
-      },
-    );
+    // Update notification tap callback to handle tap counter
+    NotificationManager().updateTapCallback((p) {
+      setState(() {
+        _notificationTapCount++;
+      });
+      _showSnackBar(
+        '📬 Notification tapped! Count: $_notificationTapCount',
+        Colors.blue,
+      );
+    });
   }
 
   void _showSnackBar(String message, Color color) {
