@@ -688,6 +688,12 @@ class _MyAppState extends State<MyApp> {
       final now = DateTime.now();
       int passedTests = 0;
 
+      debugPrint('');
+      debugPrint('═══════════════════════════════════════════════════════════');
+      debugPrint('START SCHEDULING TEST');
+      debugPrint('Current time: $now');
+      debugPrint('═══════════════════════════════════════════════════════════');
+
       // Test 1: One-time notification
       final oneTime = NotificationItem(
         id: 'test_onetime_${now.millisecondsSinceEpoch}',
@@ -697,15 +703,49 @@ class _MyAppState extends State<MyApp> {
         oneTimeDate: now.add(const Duration(minutes: 3)),
         createdAt: now,
       );
+
+      debugPrint('');
+      debugPrint('━━━ TEST 1: ONE-TIME NOTIFICATION ━━━');
+      debugPrint('Notification ID (string): ${oneTime.id}');
+      debugPrint('Expected system ID (hashCode): ${oneTime.id.hashCode}');
+      debugPrint('HashCode is negative: ${oneTime.id.hashCode < 0}');
+      debugPrint('Scheduled for: ${oneTime.oneTimeDate}');
+      debugPrint(
+        'Minutes in future: ${oneTime.oneTimeDate!.difference(now).inMinutes}',
+      );
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
       await manager.schedule(oneTime);
+
+      // Wait a moment for system to register
+      await Future.delayed(const Duration(milliseconds: 500));
 
       // Verify it was scheduled in system
       final pendingAfterOne = await manager.getPendingNotifications();
-      if (pendingAfterOne.any((p) => p.id == oneTime.id.hashCode)) {
+
+      debugPrint('');
+      debugPrint('━━━ SYSTEM PENDING NOTIFICATIONS AFTER ONE-TIME ━━━');
+      debugPrint('Total pending: ${pendingAfterOne.length}');
+      if (pendingAfterOne.isEmpty) {
+        debugPrint('❌ NO NOTIFICATIONS IN SYSTEM!');
+      } else {
+        for (var i = 0; i < pendingAfterOne.length; i++) {
+          final p = pendingAfterOne[i];
+          debugPrint('[$i] ID: ${p.id}, Title: ${p.title}, Body: ${p.body}');
+        }
+      }
+      debugPrint('Looking for ID: ${oneTime.id.hashCode}');
+      final foundOne = pendingAfterOne.any((p) => p.id == oneTime.id.hashCode);
+      debugPrint('Found: $foundOne');
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+      if (foundOne) {
         details['1️⃣ One-Time Scheduling'] = '✅ Verified in system';
         passedTests++;
       } else {
         details['1️⃣ One-Time Scheduling'] = '❌ Not found in system';
+        details['🔍 Expected ID'] = '${oneTime.id.hashCode}';
+        details['🔍 System IDs'] = pendingAfterOne.map((p) => p.id).join(', ');
       }
 
       // Test 2: Recurring notification
@@ -720,15 +760,49 @@ class _MyAppState extends State<MyApp> {
         endDate: now.add(const Duration(days: 3)),
         createdAt: now,
       );
+
+      debugPrint('');
+      debugPrint('━━━ TEST 2: RECURRING NOTIFICATION ━━━');
+      debugPrint('Notification ID (string): ${recurring.id}');
+      debugPrint('Expected system ID (hashCode): ${recurring.id.hashCode}');
+      debugPrint('HashCode is negative: ${recurring.id.hashCode < 0}');
+      debugPrint('Recurring time: ${recurring.recurringTime}');
+      debugPrint('Next scheduled time: ${recurring.nextScheduledTime}');
+      debugPrint('End date: ${recurring.endDate}');
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
       await manager.schedule(recurring);
+
+      // Wait a moment for system to register
+      await Future.delayed(const Duration(milliseconds: 500));
 
       // Verify it was scheduled
       final pendingAfterRecur = await manager.getPendingNotifications();
-      if (pendingAfterRecur.any((p) => p.id == recurring.id.hashCode)) {
+
+      debugPrint('');
+      debugPrint('━━━ SYSTEM PENDING NOTIFICATIONS AFTER RECURRING ━━━');
+      debugPrint('Total pending: ${pendingAfterRecur.length}');
+      if (pendingAfterRecur.isEmpty) {
+        debugPrint('❌ NO NOTIFICATIONS IN SYSTEM!');
+      } else {
+        for (var i = 0; i < pendingAfterRecur.length; i++) {
+          final p = pendingAfterRecur[i];
+          debugPrint('[$i] ID: ${p.id}, Title: ${p.title}, Body: ${p.body}');
+        }
+      }
+      debugPrint('Looking for ID: ${recurring.id.hashCode}');
+      final foundRecur = pendingAfterRecur.any(
+        (p) => p.id == recurring.id.hashCode,
+      );
+      debugPrint('Found: $foundRecur');
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+      if (foundRecur) {
         details['2️⃣ Recurring Scheduling'] = '✅ Verified in system';
         passedTests++;
       } else {
         details['2️⃣ Recurring Scheduling'] = '❌ Not found in system';
+        details['🔍 Expected ID (Recur)'] = '${recurring.id.hashCode}';
       }
 
       details['📊 Pending Notifications'] =
@@ -736,6 +810,16 @@ class _MyAppState extends State<MyApp> {
 
       // Test 3: Verify in database
       final stored = await manager.getById(oneTime.id);
+
+      debugPrint('');
+      debugPrint('━━━ TEST 3: DATABASE STORAGE ━━━');
+      debugPrint('Looking for ID in DB: ${oneTime.id}');
+      debugPrint('Found in DB: ${stored != null}');
+      if (stored != null) {
+        debugPrint('Stored notification: ${stored.title}');
+      }
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
       if (stored != null) {
         details['3️⃣ Database Storage'] = '✅ Notification saved to DB';
         passedTests++;
@@ -743,18 +827,51 @@ class _MyAppState extends State<MyApp> {
         details['3️⃣ Database Storage'] = '❌ Not found in DB';
       }
 
+      // Get manager diagnostics
+      debugPrint('');
+      debugPrint('━━━ NOTIFICATION MANAGER DIAGNOSTICS ━━━');
+      final stats = await manager.getStatistics();
+      debugPrint('Statistics:');
+      stats.forEach((key, value) => debugPrint('  $key: $value'));
+
+      final health = await manager.checkHealth();
+      debugPrint('Health Check:');
+      health.forEach((key, value) => debugPrint('  $key: $value'));
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
       // Cleanup
+      debugPrint('');
+      debugPrint('━━━ CLEANUP ━━━');
       await manager.delete(oneTime.id);
       await manager.delete(recurring.id);
       details['🧹 Cleanup'] = '✅ Test notifications removed';
+      debugPrint('Test notifications deleted');
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
+      details['📊 Tests Passed'] = '$passedTests/3';
       passed = passedTests >= 2;
+
       if (!passed) {
         error = 'Only $passedTests/3 scheduling tests passed';
       }
-    } catch (e) {
+
+      debugPrint('');
+      debugPrint('═══════════════════════════════════════════════════════════');
+      debugPrint(
+        'END SCHEDULING TEST - Result: ${passed ? "PASSED" : "FAILED"}',
+      );
+      debugPrint('═══════════════════════════════════════════════════════════');
+      debugPrint('');
+    } catch (e, stackTrace) {
       passed = false;
       error = 'Exception: ${e.toString()}';
+      debugPrint('');
+      debugPrint('❌❌❌ EXCEPTION IN SCHEDULING TEST ❌❌❌');
+      debugPrint('Error: $e');
+      debugPrint('Stack trace:');
+      debugPrint(stackTrace.toString());
+      debugPrint('❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌');
+      debugPrint('');
     }
 
     stopwatch.stop();

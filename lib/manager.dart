@@ -4,7 +4,6 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tzdata;
-import 'package:flutter_native_timezone/flutter_native_timezone.dart';
 
 // Import your components
 import 'storage.dart';
@@ -38,26 +37,36 @@ class NotificationManager {
   Future<void> initialize({Function(String?)? onNotificationTap}) async {
     if (_initialized) return;
 
+    debugPrint('');
+    debugPrint('╔═══════════════════════════════════════════════════════════╗');
+    debugPrint('║ INITIALIZING NOTIFICATION MANAGER                         ║');
+    debugPrint('╚═══════════════════════════════════════════════════════════╝');
+
     _onNotificationTap = onNotificationTap;
 
-    // Ensure timezone data is initialized before using tz.local. This avoids
-    // a LateInitializationError coming from the timezone package when
-    // calling tz.TZDateTime.from(..., tz.local).
+    // Ensure timezone data is initialized before using tz.local
+    debugPrint('🌍 Initializing timezone...');
     try {
       tzdata.initializeTimeZones();
+      debugPrint('✅ Timezone data initialized');
+
+      // Hardcode Lagos timezone since you're in Nigeria
       try {
-        final String name = await FlutterNativeTimezone.getLocalTimezone();
-        tz.setLocalLocation(tz.getLocation(name));
+        tz.setLocalLocation(tz.getLocation('Africa/Lagos'));
+        debugPrint('✅ Timezone set to: ${tz.local.name}');
+        debugPrint('   Current time: ${tz.TZDateTime.now(tz.local)}');
       } catch (e) {
-        // If platform timezone lookup fails, fallback to UTC.
+        debugPrint('⚠️ Failed to set Africa/Lagos: $e');
         try {
           tz.setLocalLocation(tz.getLocation('UTC'));
+          debugPrint('⚠️ Using UTC as fallback');
+          debugPrint('   Current time: ${tz.TZDateTime.now(tz.local)}');
         } catch (e2) {
-          debugPrint('Failed to set fallback timezone: $e2');
+          debugPrint('❌ Failed to set fallback timezone: $e2');
         }
       }
     } catch (e) {
-      debugPrint('Timezone initialization failed: $e');
+      debugPrint('❌ Timezone initialization failed: $e');
     }
 
     // Android initialization settings
@@ -65,32 +74,36 @@ class NotificationManager {
       '@mipmap/ic_launcher',
     );
 
-    // iOS initialization settings (if needed in future)
-    const iosSettings = DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
-    );
+    const initSettings = InitializationSettings(android: androidSettings);
 
-    const initSettings = InitializationSettings(
-      android: androidSettings,
-      iOS: iosSettings,
-    );
+    debugPrint('');
+    debugPrint('📱 Initializing notification plugin...');
 
     // Initialize plugin
     await _plugin.initialize(
       initSettings,
       onDidReceiveNotificationResponse: (details) {
+        debugPrint('📬 Notification tapped: ${details.payload}');
         if (_onNotificationTap != null) {
           _onNotificationTap!(details.payload);
         }
       },
     );
 
+    debugPrint('✅ Plugin initialized');
+
     // Create notification channels
+    debugPrint('');
+    debugPrint('📢 Creating notification channels...');
     await _createNotificationChannels();
+    debugPrint('✅ Channels created');
 
     _initialized = true;
+
+    debugPrint('');
+    debugPrint('✅ NOTIFICATION MANAGER READY');
+    debugPrint('╚═══════════════════════════════════════════════════════════╝');
+    debugPrint('');
   }
 
   /// Update the notification tap callback without re-initializing
@@ -142,6 +155,7 @@ class NotificationManager {
   // ============================================================================
 
   /// Schedule a notification
+  /// Schedule a notification
   Future<void> schedule(NotificationItem item) async {
     // Ensure manager is initialized (safety for callers that didn't await)
     if (!_initialized) {
@@ -149,21 +163,87 @@ class NotificationManager {
       await initialize();
     }
 
+    // 🔍 DEBUG: Start of scheduling
+    int notificationId = item.id.hashCode;
+    debugPrint('');
+    debugPrint('┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓');
+    debugPrint('┃ SCHEDULING NOTIFICATION                         ┃');
+    debugPrint('┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛');
+    debugPrint('String ID: ${item.id}');
+    debugPrint('Int ID (hashCode): $notificationId');
+    debugPrint('HashCode is negative: ${notificationId < 0}');
+    debugPrint('Title: ${item.title}');
+    debugPrint('Body: ${item.body}');
+    debugPrint('Source: ${item.source.name}');
+    debugPrint('Type: ${item.isRecurring ? "Recurring" : "One-time"}');
+    debugPrint('Is expired: ${item.isExpired}');
+    debugPrint('Is active: ${item.isActive}');
+
+    if (item.isRecurring) {
+      debugPrint('Recurring time: ${item.recurringTime}');
+      debugPrint('Next scheduled: ${item.nextScheduledTime}');
+      debugPrint('End date: ${item.endDate}');
+    } else {
+      debugPrint('One-time date: ${item.oneTimeDate}');
+      if (item.oneTimeDate != null) {
+        final now = DateTime.now();
+        debugPrint('Current time: $now');
+        debugPrint('Time difference: ${item.oneTimeDate!.difference(now)}');
+        debugPrint('Is in future: ${item.oneTimeDate!.isAfter(now)}');
+      }
+    }
+
     // Save to database first
-    await _storage.saveNotification(item);
+    debugPrint('');
+    debugPrint('💾 Saving to database...');
+    try {
+      await _storage.saveNotification(item);
+      debugPrint('✅ Saved to database successfully');
+    } catch (e) {
+      debugPrint('❌ Failed to save to database: $e');
+      rethrow;
+    }
 
     // Check if expired
     if (item.isExpired) {
+      debugPrint('⚠️ Notification is expired, deleting...');
       await delete(item.id);
+      debugPrint('┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛');
+      debugPrint('');
       return;
     }
 
     // Schedule based on type
+    debugPrint('');
+    debugPrint('📅 Scheduling in system...');
     if (item.isRecurring) {
       await _scheduleRecurring(item);
     } else {
       await _scheduleOneTime(item);
     }
+
+    // 🔍 DEBUG: Verify it was actually scheduled
+    debugPrint('');
+    debugPrint('🔍 Verifying in system...');
+    final pending = await _plugin.pendingNotificationRequests();
+    bool found = pending.any((p) => p.id == notificationId);
+
+    if (found) {
+      debugPrint('✅ VERIFIED in system pending notifications');
+      final matchingNotif = pending.firstWhere((p) => p.id == notificationId);
+      debugPrint('   ID: ${matchingNotif.id}');
+      debugPrint('   Title: ${matchingNotif.title}');
+      debugPrint('   Body: ${matchingNotif.body}');
+    } else {
+      debugPrint('❌ NOT FOUND in system pending notifications!');
+      debugPrint('   System has ${pending.length} pending notifications:');
+      for (var p in pending.take(5)) {
+        debugPrint('   - ID: ${p.id}, Title: ${p.title}');
+      }
+    }
+
+    debugPrint('┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛');
+    debugPrint('');
   }
 
   /// Schedule multiple notifications
@@ -175,34 +255,53 @@ class NotificationManager {
 
   /// Schedule a one-time notification
   Future<void> _scheduleOneTime(NotificationItem item) async {
-    if (item.oneTimeDate == null) return;
-    try {
-      final settings = await _storage.getSettings();
-      final details = await _buildNotificationDetails(settings, item);
+    debugPrint('  → _scheduleOneTime() called');
 
-      debugPrint(
-        'Scheduling one-time notification ${item.id} at ${item.oneTimeDate} (hash ${item.id.hashCode})',
-      );
+    if (item.oneTimeDate == null) {
+      debugPrint('  ❌ oneTimeDate is null, cannot schedule');
+      return;
+    }
+
+    final settings = await _storage.getSettings();
+    final details = await _buildNotificationDetails(settings, item);
+
+    try {
+      final now = tz.TZDateTime.now(tz.local);
+      final scheduled = tz.TZDateTime.from(item.oneTimeDate!, tz.local);
+
+      debugPrint('  📍 Timezone info:');
+      debugPrint('     tz.local: ${tz.local.name}');
+      debugPrint('     Now (TZ): $now');
+      debugPrint('     Scheduled (TZ): $scheduled');
+      debugPrint('     Difference: ${scheduled.difference(now)}');
+      debugPrint('     Is after now: ${scheduled.isAfter(now)}');
+
+      if (!scheduled.isAfter(now)) {
+        debugPrint('  ⚠️ SKIPPING: Scheduled time is NOT in the future');
+        debugPrint('     This is why the notification was not scheduled!');
+        return;
+      }
+
+      debugPrint('  ✅ Time is valid, calling zonedSchedule...');
 
       await _plugin.zonedSchedule(
         item.id.hashCode,
         item.title,
         item.body,
-        tz.TZDateTime.from(item.oneTimeDate!, tz.local),
+        scheduled,
         details,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         payload: item.id,
       );
 
-      // Log pending notifications after scheduling for diagnostics
+      debugPrint('  ✅ zonedSchedule completed without error');
+
       final pending = await _plugin.pendingNotificationRequests();
-      debugPrint(
-        'Pending notifications after scheduling one-time (${item.id}): ${pending.map((p) => p.id).toList()}',
-      );
+      debugPrint('  📊 Pending count after schedule: ${pending.length}');
     } catch (e, st) {
-      debugPrint(
-        'Failed to schedule one-time notification ${item.id}: $e\n$st',
-      );
+      debugPrint('  ❌ EXCEPTION in _scheduleOneTime:');
+      debugPrint('     Error: $e');
+      debugPrint('     Stack trace: $st');
     }
   }
 
@@ -220,15 +319,33 @@ class NotificationManager {
     final settings = await _storage.getSettings();
     final details = await _buildNotificationDetails(settings, item);
     try {
+      // Convert nextTime (DateTime) into TZDateTime in local zone and ensure it's in the future
+      var scheduled = tz.TZDateTime.from(nextTime, tz.local);
+      final now = tz.TZDateTime.now(tz.local);
+
+      // If scheduled is not in the future, move it forward by one day until it is.
+      int safety = 0;
+      while (!scheduled.isAfter(now) && safety < 7) {
+        scheduled = scheduled.add(const Duration(days: 1));
+        safety++;
+      }
+
+      if (!scheduled.isAfter(now)) {
+        debugPrint(
+          'Skipping recurring scheduling for ${item.id}: could not compute future instance (nextTime: $nextTime)',
+        );
+        return;
+      }
+
       debugPrint(
-        'Scheduling recurring notification ${item.id} at $nextTime (hash ${item.id.hashCode})',
+        'Scheduling recurring notification ${item.id} at $scheduled (now: $now)',
       );
 
       await _plugin.zonedSchedule(
         item.id.hashCode,
         item.title,
         item.body,
-        tz.TZDateTime.from(nextTime, tz.local),
+        scheduled,
         details,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         matchDateTimeComponents: DateTimeComponents.time, // Repeat daily
