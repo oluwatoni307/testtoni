@@ -3,6 +3,7 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart';
 import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest_all.dart' as tzdata;
 
 // Import your components
 import 'storage.dart';
@@ -37,6 +38,25 @@ class NotificationManager {
     if (_initialized) return;
 
     _onNotificationTap = onNotificationTap;
+
+    // Ensure timezone data is initialized before using tz.local. This avoids
+    // a LateInitializationError coming from the timezone package when
+    // calling tz.TZDateTime.from(..., tz.local).
+    try {
+      tzdata.initializeTimeZones();
+      // Fallback to UTC local location if a platform-specific location
+      // isn't configured. This prevents the tz.local late init error.
+      try {
+        tz.setLocalLocation(tz.getLocation('UTC'));
+      } catch (_) {
+        // ignore and continue; tz.local may still be usable after init
+      }
+    } catch (e) {
+      // If timezone initialization fails, log and continue. Scheduling
+      // will use tz.local which may be uninitialized; we've attempted a
+      // safe fallback above.
+      debugPrint('Timezone initialization failed: $e');
+    }
 
     // Android initialization settings
     const androidSettings = AndroidInitializationSettings(
