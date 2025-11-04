@@ -1183,7 +1183,7 @@ class _MyAppState extends State<MyApp> {
         createdAt: now,
       );
 
-      await manager.schedule(quickNotif);
+      await manager.showNow(quickNotif);
 
       details['⏰ Scheduled For'] =
           '${fireTime.hour}:${fireTime.minute}:${fireTime.second}';

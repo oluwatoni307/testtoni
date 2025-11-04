@@ -364,6 +364,59 @@ class NotificationManager {
   }
 
   // ============================================================================
+  // IMMEDIATE NOTIFICATIONS
+  // ============================================================================
+
+  /// Show a notification immediately (not scheduled)
+  Future<void> showNow(NotificationItem item) async {
+    // Ensure manager is initialized
+    if (!_initialized) {
+      debugPrint('NotificationManager not initialized — initializing now');
+      await initialize();
+    }
+
+    int notificationId = item.id.hashCode.abs(); // Use positive ID
+
+    debugPrint('');
+    debugPrint('┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓');
+    debugPrint('┃ SHOWING IMMEDIATE NOTIFICATION                  ┃');
+    debugPrint('┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛');
+    debugPrint('ID: $notificationId');
+    debugPrint('Title: ${item.title}');
+    debugPrint('Body: ${item.body}');
+
+    final settings = await _storage.getSettings();
+    final details = await _buildNotificationDetails(settings, item);
+
+    try {
+      await _plugin.show(
+        notificationId,
+        item.title,
+        item.body,
+        details,
+        payload: item.id,
+      );
+
+      debugPrint('✅ Notification shown immediately');
+    } catch (e, st) {
+      debugPrint('❌ EXCEPTION showing immediate notification:');
+      debugPrint('   Error: $e');
+      debugPrint('   Stack trace: $st');
+      rethrow;
+    }
+
+    debugPrint('┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛');
+    debugPrint('');
+  }
+
+  /// Show multiple notifications immediately
+  Future<void> showNowMultiple(List<NotificationItem> items) async {
+    for (final item in items) {
+      await showNow(item);
+    }
+  }
+
+  // ============================================================================
   // UPDATING
   // ============================================================================
 
