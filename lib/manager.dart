@@ -4,6 +4,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tzdata;
+import 'package:flutter_native_timezone/flutter_native_timezone.dart';
 
 // Import your components
 import 'storage.dart';
@@ -44,17 +45,18 @@ class NotificationManager {
     // calling tz.TZDateTime.from(..., tz.local).
     try {
       tzdata.initializeTimeZones();
-      // Fallback to UTC local location if a platform-specific location
-      // isn't configured. This prevents the tz.local late init error.
       try {
-        tz.setLocalLocation(tz.getLocation('UTC'));
-      } catch (_) {
-        // ignore and continue; tz.local may still be usable after init
+        final String name = await FlutterNativeTimezone.getLocalTimezone();
+        tz.setLocalLocation(tz.getLocation(name));
+      } catch (e) {
+        // If platform timezone lookup fails, fallback to UTC.
+        try {
+          tz.setLocalLocation(tz.getLocation('UTC'));
+        } catch (e2) {
+          debugPrint('Failed to set fallback timezone: $e2');
+        }
       }
     } catch (e) {
-      // If timezone initialization fails, log and continue. Scheduling
-      // will use tz.local which may be uninitialized; we've attempted a
-      // safe fallback above.
       debugPrint('Timezone initialization failed: $e');
     }
 
@@ -141,6 +143,12 @@ class NotificationManager {
 
   /// Schedule a notification
   Future<void> schedule(NotificationItem item) async {
+    // Ensure manager is initialized (safety for callers that didn't await)
+    if (!_initialized) {
+      debugPrint('NotificationManager not initialized — initializing now');
+      await initialize();
+    }
+
     // Save to database first
     await _storage.saveNotification(item);
 
@@ -168,20 +176,34 @@ class NotificationManager {
   /// Schedule a one-time notification
   Future<void> _scheduleOneTime(NotificationItem item) async {
     if (item.oneTimeDate == null) return;
+    try {
+      final settings = await _storage.getSettings();
+      final details = await _buildNotificationDetails(settings, item);
 
-    final settings = await _storage.getSettings();
-    final details = await _buildNotificationDetails(settings, item);
+      debugPrint(
+        'Scheduling one-time notification ${item.id} at ${item.oneTimeDate} (hash ${item.id.hashCode})',
+      );
 
-    await _plugin.zonedSchedule(
-      item.id.hashCode,
-      item.title,
-      item.body,
-      tz.TZDateTime.from(item.oneTimeDate!, tz.local),
-      details,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      await _plugin.zonedSchedule(
+        item.id.hashCode,
+        item.title,
+        item.body,
+        tz.TZDateTime.from(item.oneTimeDate!, tz.local),
+        details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        payload: item.id,
+      );
 
-      payload: item.id,
-    );
+      // Log pending notifications after scheduling for diagnostics
+      final pending = await _plugin.pendingNotificationRequests();
+      debugPrint(
+        'Pending notifications after scheduling one-time (${item.id}): ${pending.map((p) => p.id).toList()}',
+      );
+    } catch (e, st) {
+      debugPrint(
+        'Failed to schedule one-time notification ${item.id}: $e\n$st',
+      );
+    }
   }
 
   /// Schedule a recurring notification
@@ -197,18 +219,31 @@ class NotificationManager {
 
     final settings = await _storage.getSettings();
     final details = await _buildNotificationDetails(settings, item);
+    try {
+      debugPrint(
+        'Scheduling recurring notification ${item.id} at $nextTime (hash ${item.id.hashCode})',
+      );
 
-    await _plugin.zonedSchedule(
-      item.id.hashCode,
-      item.title,
-      item.body,
-      tz.TZDateTime.from(nextTime, tz.local),
-      details,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      await _plugin.zonedSchedule(
+        item.id.hashCode,
+        item.title,
+        item.body,
+        tz.TZDateTime.from(nextTime, tz.local),
+        details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        matchDateTimeComponents: DateTimeComponents.time, // Repeat daily
+        payload: item.id,
+      );
 
-      matchDateTimeComponents: DateTimeComponents.time, // Repeat daily
-      payload: item.id,
-    );
+      final pending = await _plugin.pendingNotificationRequests();
+      debugPrint(
+        'Pending notifications after scheduling recurring (${item.id}): ${pending.map((p) => p.id).toList()}',
+      );
+    } catch (e, st) {
+      debugPrint(
+        'Failed to schedule recurring notification ${item.id}: $e\n$st',
+      );
+    }
   }
 
   // ============================================================================
