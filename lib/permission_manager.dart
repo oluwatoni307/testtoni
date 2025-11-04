@@ -3,6 +3,7 @@
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:app_settings/app_settings.dart';
+import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'model.dart';
 
@@ -380,10 +381,10 @@ This allows the app to send reminders on time.
   /// Print diagnostic information (for debugging)
   Future<void> printDiagnostics() async {
     final report = await getPermissionReport();
-    print('=== Permission Diagnostics ===');
+    debugPrint('=== Permission Diagnostics ===');
     report.forEach((key, value) {
-      print('$key: $value');
+      debugPrint('$key: $value');
     });
-    print('============================');
+    debugPrint('============================');
   }
 }

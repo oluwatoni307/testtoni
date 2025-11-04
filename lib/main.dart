@@ -8,6 +8,12 @@ import 'model.dart';
 import 'permission_manager.dart';
 import 'storage.dart';
 
+// Global scaffold messenger key to avoid calling ScaffoldMessenger.of(context)
+// when the BuildContext might not contain a Scaffold yet (prevents null
+// check operator errors when showing snackbars from async callbacks).
+final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
+    GlobalKey<ScaffoldMessengerState>();
+
 /* ==========================  MAIN  ========================== */
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,35 +21,13 @@ void main() async {
   /* ----  singletons  ---- */
   await NotificationManager().initialize(
     onNotificationTap: (p) {
-      print('📬 TAPPED notification payload: $p');
+      debugPrint('📬 TAPPED notification payload: $p');
     },
   );
   await SyncManager().initialize();
 
   /* ----  WorkManager callback (top-level)  ---- */
-  @pragma('vm:entry-point')
-  void callbackDispatcher() {
-    Workmanager().executeTask((task, inputData) async {
-      await NotificationManager().initialize();
-      if (task == 'api_daily_sync') {
-        final sync = ApiDailySync(
-          apiUrl: 'https://jsonplaceholder.typicode.com/posts',
-          fetchReminders: () async => _fakeApi(),
-        );
-        final r = await sync.sync();
-        print('📡 BG API sync => $r');
-        return Future.value(r.success);
-      }
-      if (task == 'user_daily_sync') {
-        final r = await UserDailySync().sync();
-        print('👤 BG USER sync => $r');
-        return Future.value(r.success);
-      }
-      return Future.value(false);
-    });
-  }
-
-  Workmanager().initialize(callbackDispatcher, isInDebugMode: true);
+  Workmanager().initialize(callbackDispatcher);
   runApp(const MyApp());
 }
 
@@ -70,6 +54,10 @@ Future<List<NotificationItem>> _fakeApi() async {
     ),
   ];
 }
+
+/* WorkManager callback is defined in `dailly_sync.dart` as a top-level
+   function. Keep the dispatcher there (one canonical top-level symbol)
+   so WorkManager can find it from the background isolate. */
 
 /* ==========================  UI  ========================== */
 class MyApp extends StatefulWidget {
@@ -103,7 +91,19 @@ class _MyAppState extends State<MyApp> {
   }
 
   void _showSnackBar(String message, Color color) {
-    ScaffoldMessenger.of(context).showSnackBar(
+    final messenger = scaffoldMessengerKey.currentState;
+    if (messenger == null) {
+      // Fallback when messenger isn't ready: log and return
+      // This prevents the null-check operator crash seen in logs.
+      // The user will still see logs in debug; when running on device the
+      // messenger should be available after the app's first frame.
+      // Avoid throwing here.
+      // Fallback to debugPrint when messenger isn't ready.
+      debugPrint('SnackBar fallback (messenger null): $message');
+      return;
+    }
+
+    messenger.showSnackBar(
       SnackBar(
         content: Text(message),
         backgroundColor: color,
@@ -116,6 +116,7 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      scaffoldMessengerKey: scaffoldMessengerKey,
       theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),
       home: Scaffold(
         appBar: AppBar(

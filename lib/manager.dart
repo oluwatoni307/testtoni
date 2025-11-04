@@ -1,6 +1,7 @@
 // notification_manager.dart
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter/foundation.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 // Import your components
@@ -448,16 +449,16 @@ class NotificationManager {
 
   /// Print diagnostics
   Future<void> printDiagnostics() async {
-    print('=== Notification Manager Diagnostics ===');
+    debugPrint('=== Notification Manager Diagnostics ===');
 
     final stats = await getStatistics();
-    print('Statistics:');
-    stats.forEach((key, value) => print('  $key: $value'));
+    debugPrint('Statistics:');
+    stats.forEach((key, value) => debugPrint('  $key: $value'));
 
     final health = await checkHealth();
-    print('\nHealth Check:');
-    health.forEach((key, value) => print('  $key: $value'));
+    debugPrint('\nHealth Check:');
+    health.forEach((key, value) => debugPrint('  $key: $value'));
 
-    print('=======================================');
+    debugPrint('=======================================');
   }
 }

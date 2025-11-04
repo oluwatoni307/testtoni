@@ -1,6 +1,7 @@
 // daily_sync.dart
 
 import 'package:workmanager/workmanager.dart';
+import 'package:flutter/foundation.dart';
 import 'dart:async';
 
 // Import your components
@@ -241,7 +242,7 @@ void callbackDispatcher() {
 
       return Future.value(false);
     } catch (e) {
-      print('Background task error: $e');
+      debugPrint('Background task error: $e');
       return Future.value(false);
     }
   });
@@ -269,10 +270,7 @@ class SyncManager {
   Future<void> initialize() async {
     if (_initialized) return;
 
-    await Workmanager().initialize(
-      callbackDispatcher,
-      isInDebugMode: false, // Set to true for debugging
-    );
+    await Workmanager().initialize(callbackDispatcher);
 
     _initialized = true;
   }
@@ -354,6 +352,6 @@ class BootHandler {
     // 1. Save sync type to SharedPreferences
     // 2. Check which notifications exist (api vs user) and infer
 
-    print('Device rebooted - notifications rescheduled');
+    debugPrint('Device rebooted - notifications rescheduled');
   }
 }
