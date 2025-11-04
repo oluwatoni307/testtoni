@@ -1,5 +1,6 @@
 // notification_item.dart
 
+import 'dart:convert';
 import 'package:flutter/material.dart';
 
 enum NotificationSource { api, user }
@@ -129,6 +130,52 @@ class NotificationItem {
       return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
     }
 
+    // Support both camelCase and snake_case keys to be compatible with
+    // older/other versions of the DB or external JSON sources.
+    final dynamic oneTimeRaw = json['oneTimeDate'] ?? json['one_time_date'];
+    final dynamic recurringRaw =
+        json['recurringTime'] ?? json['recurring_time'];
+    final dynamic endDateRaw = json['endDate'] ?? json['end_date'];
+    final dynamic isActiveRaw = json['isActive'] ?? json['is_active'];
+    final dynamic createdAtRaw = json['createdAt'] ?? json['created_at'];
+    final dynamic updatedAtRaw = json['updatedAt'] ?? json['updated_at'];
+    final dynamic extrasRaw = json['extras'];
+
+    final DateTime? oneTime = oneTimeRaw != null
+        ? DateTime.fromMillisecondsSinceEpoch(oneTimeRaw as int)
+        : null;
+
+    final TimeOfDay? recurring = parseRecurringTime(recurringRaw as String?);
+
+    final DateTime? end = endDateRaw != null
+        ? DateTime.fromMillisecondsSinceEpoch(endDateRaw as int)
+        : null;
+
+    final bool active = isActiveRaw == 1 || isActiveRaw == true;
+
+    final DateTime created = DateTime.fromMillisecondsSinceEpoch(
+      createdAtRaw as int,
+    );
+
+    final DateTime? updated = updatedAtRaw != null
+        ? DateTime.fromMillisecondsSinceEpoch(updatedAtRaw as int)
+        : null;
+
+    Map<String, dynamic>? extrasMap;
+    if (extrasRaw is String) {
+      try {
+        extrasMap = extrasRaw.isNotEmpty
+            ? Map<String, dynamic>.from(jsonDecode(extrasRaw))
+            : null;
+      } catch (_) {
+        extrasMap = null;
+      }
+    } else if (extrasRaw is Map) {
+      extrasMap = Map<String, dynamic>.from(extrasRaw);
+    } else {
+      extrasMap = null;
+    }
+
     return NotificationItem(
       id: json['id'] as String,
       title: json['title'] as String,
@@ -136,19 +183,13 @@ class NotificationItem {
       source: NotificationSource.values.firstWhere(
         (e) => e.name == json['source'],
       ),
-      oneTimeDate: json['oneTimeDate'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(json['oneTimeDate'] as int)
-          : null,
-      recurringTime: parseRecurringTime(json['recurringTime'] as String?),
-      endDate: json['endDate'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(json['endDate'] as int)
-          : null,
-      isActive: json['isActive'] == 1,
-      createdAt: DateTime.fromMillisecondsSinceEpoch(json['createdAt'] as int),
-      updatedAt: json['updatedAt'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(json['updatedAt'] as int)
-          : null,
-      extras: json['extras'] as Map<String, dynamic>?,
+      oneTimeDate: oneTime,
+      recurringTime: recurring,
+      endDate: end,
+      isActive: active,
+      createdAt: created,
+      updatedAt: updated,
+      extras: extrasMap,
     );
   }
 

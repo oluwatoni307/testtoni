@@ -33,7 +33,12 @@ class NotificationStorage {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, 'notifications.db');
 
-    return await openDatabase(path, version: 1, onCreate: _createDatabase);
+    return await openDatabase(
+      path,
+      version: 2,
+      onCreate: _createDatabase,
+      onUpgrade: _onUpgrade,
+    );
   }
 
   Future<void> _createDatabase(Database db, int version) async {
@@ -44,12 +49,12 @@ class NotificationStorage {
         title TEXT NOT NULL,
         body TEXT NOT NULL,
         source TEXT NOT NULL,
-        one_time_date INTEGER,
-        recurring_time TEXT,
-        end_date INTEGER,
-        is_active INTEGER DEFAULT 1,
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER,
+        oneTimeDate INTEGER,
+        recurringTime TEXT,
+        endDate INTEGER,
+        isActive INTEGER DEFAULT 1,
+        createdAt INTEGER NOT NULL,
+        updatedAt INTEGER,
         extras TEXT
       )
     ''');
@@ -60,8 +65,44 @@ class NotificationStorage {
     ''');
 
     await db.execute('''
-      CREATE INDEX idx_active ON notifications(is_active)
+      CREATE INDEX idx_active ON notifications(isActive)
     ''');
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    // Migration to version 2: ensure camelCase column names exist to match
+    // NotificationItem.toJson() keys (oneTimeDate, recurringTime, endDate, etc.)
+    if (oldVersion < 2) {
+      final info = await db.rawQuery('PRAGMA table_info(notifications)');
+      final existing = info.map((row) => row['name'] as String).toSet();
+
+      final columns = <String, String>{
+        'oneTimeDate': 'INTEGER',
+        'recurringTime': 'TEXT',
+        'endDate': 'INTEGER',
+        'isActive': 'INTEGER DEFAULT 1',
+        'createdAt': 'INTEGER',
+        'updatedAt': 'INTEGER',
+        'extras': 'TEXT',
+      };
+
+      for (final entry in columns.entries) {
+        final name = entry.key;
+        final type = entry.value;
+        if (!existing.contains(name)) {
+          try {
+            await db.execute(
+              'ALTER TABLE notifications ADD COLUMN $name $type',
+            );
+          } catch (e) {
+            // If ALTER fails for any reason, log and continue. We don't want
+            // migrations to crash the app on startup.
+            // ignore: avoid_print
+            print('Migration: failed to add column $name: $e');
+          }
+        }
+      }
+    }
   }
 
   // ============================================================================
@@ -135,7 +176,7 @@ class NotificationStorage {
     final db = await database;
     final results = await db.query(
       'notifications',
-      where: 'is_active = ?',
+      where: 'isActive = ?',
       whereArgs: [1],
     );
 
@@ -159,7 +200,7 @@ class NotificationStorage {
 
     return await db.delete(
       'notifications',
-      where: 'end_date IS NOT NULL AND end_date < ?',
+      where: 'endDate IS NOT NULL AND endDate < ?',
       whereArgs: [now],
     );
   }
@@ -318,7 +359,7 @@ class NotificationStorage {
     final activeCount =
         Sqflite.firstIntValue(
           await db.rawQuery(
-            'SELECT COUNT(*) FROM notifications WHERE is_active = 1',
+            'SELECT COUNT(*) FROM notifications WHERE isActive = 1',
           ),
         ) ??
         0;
