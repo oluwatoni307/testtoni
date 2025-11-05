@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:workmanager/workmanager.dart';
 import 'dart:async';
+import 'dart:io' show Platform;
+import 'package:device_info_plus/device_info_plus.dart';
 
 import 'dailly_sync.dart';
 import 'not_manager.dart';
 import 'model.dart';
 import 'permission_manager.dart';
 import 'storage.dart';
+import 'native_alarm_manager.dart';
 
 // Global scaffold messenger key to avoid calling ScaffoldMessenger.of(context)
 // when the BuildContext might not contain a Scaffold yet (prevents null
@@ -18,21 +21,107 @@ final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  /* ----  singletons  ---- */
+  /* ----  Request permissions first  ---- */
+  final permManager = PermissionManager();
+  debugPrint('=== Starting permission initialization sequence ===');
+
+  // Initial permission check
+  final initialStatus = await permManager.checkAllPermissions();
+  debugPrint('📋 Initial permission status:');
+  debugPrint('  • Notifications: ${initialStatus.notificationsGranted}');
+  debugPrint('  • Exact Alarms: ${initialStatus.exactAlarmsGranted}');
+  debugPrint('  • Battery Optimized: ${initialStatus.batteryOptimized}');
+
+  // Request all permissions first
+  debugPrint('🔄 Requesting all permissions...');
+  final permissionStatus = await permManager.requestAllPermissions();
+
+  // Handle battery optimization first
+  if (permissionStatus.batteryOptimized) {
+    debugPrint('⚠️ Battery optimization is enabled, requesting exemption...');
+    try {
+      await permManager.openBatterySettings();
+      // Wait for user to return from settings
+      await Future.delayed(const Duration(seconds: 3));
+    } catch (e) {
+      debugPrint('❌ Error opening battery settings: $e');
+    }
+  }
+
+  // Then handle exact alarms
+  if (!permissionStatus.exactAlarmsGranted) {
+    debugPrint('⚠️ Exact alarms not granted, requesting permission...');
+    try {
+      await permManager.openAlarmSettings();
+      // Wait for user to return from settings
+      await Future.delayed(const Duration(seconds: 3));
+
+      // Verify exact alarm permission was granted
+      final canSchedule = await NativeAlarmManager.canScheduleExactAlarms();
+      debugPrint('✓ Can schedule exact alarms: $canSchedule');
+      if (!canSchedule) {
+        debugPrint('❌ Exact alarms still not granted!');
+      }
+    } catch (e) {
+      debugPrint('❌ Error opening alarm settings: $e');
+    }
+  }
+
+  // Final comprehensive permission check
+  final finalStatus = await permManager.checkAllPermissions();
+  debugPrint('📋 Final permission status:');
+  debugPrint('  • Notifications: ${finalStatus.notificationsGranted}');
+  debugPrint('  • Exact Alarms: ${finalStatus.exactAlarmsGranted}');
+  debugPrint('  • Battery Optimized: ${finalStatus.batteryOptimized}');
+
+  if (!finalStatus.allGranted) {
+    debugPrint(
+      '⚠️ Some permissions still not granted: ${finalStatus.missingPermissions}',
+    );
+    // Notify about missing critical permissions
+    if (!finalStatus.notificationsGranted || !finalStatus.exactAlarmsGranted) {
+      debugPrint(
+        '❌ Critical permissions missing - notifications may not work!',
+      );
+    }
+  } else {
+    debugPrint('✅ All permissions granted successfully!');
+  }
+
+  // Additional platform checks
+  if (Platform.isAndroid) {
+    final androidInfo = await DeviceInfoPlugin().androidInfo;
+    debugPrint('📱 Android device info:');
+    debugPrint('  • SDK Version: ${androidInfo.version.sdkInt}');
+    debugPrint('  • Manufacturer: ${androidInfo.manufacturer}');
+    debugPrint('  • Model: ${androidInfo.model}');
+
+    // Specific Android checks
+    if (androidInfo.version.sdkInt >= 31) {
+      // Android 12+
+      debugPrint('🔍 Running additional Android 12+ checks...');
+      final canScheduleAlarms =
+          await NativeAlarmManager.canScheduleExactAlarms();
+      debugPrint('  • Can schedule exact alarms: $canScheduleAlarms');
+
+      if (!canScheduleAlarms) {
+        debugPrint('❌ Exact alarms permission denied on Android 12+');
+        debugPrint(
+          '   This will prevent notifications from working correctly!',
+        );
+      }
+    }
+  }
+
+  debugPrint('=== Permission initialization sequence completed ===\n');
+
+  /* ----  Initialize managers  ---- */
   await NotificationManager().initialize(
     onNotificationTap: (p) {
       debugPrint('📬 TAPPED notification payload: $p');
     },
   );
   await SyncManager().initialize();
-
-  /* ----  Request permissions first  ---- */
-  final permissionStatus = await PermissionManager().requestAllPermissions();
-  if (!permissionStatus.allGranted) {
-    debugPrint(
-      '⚠️ Some permissions not granted: ${permissionStatus.missingPermissions}',
-    );
-  }
 
   /* ----  WorkManager callback (top-level)  ---- */
   Workmanager().initialize(callbackDispatcher);
@@ -1161,8 +1250,8 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _testQuickNotification() async {
-    _showSnackBar('🚀 Scheduling instant notification...', Colors.blue);
-    setState(() => _currentTest = 'Testing Quick Notification...');
+    _showSnackBar('🚀 Testing native notifications...', Colors.blue);
+    setState(() => _currentTest = 'Testing Native Notifications...');
 
     final stopwatch = Stopwatch()..start();
     final details = <String, dynamic>{};
@@ -1172,52 +1261,149 @@ class _MyAppState extends State<MyApp> {
     try {
       final manager = NotificationManager();
       final now = DateTime.now();
-      final fireTime = now.add(const Duration(seconds: 5));
 
-      final quickNotif = NotificationItem(
-        id: 'quick_${now.millisecondsSinceEpoch}',
-        title: '⚡ Quick Test Notification',
-        body: 'This should appear in 5 seconds! Tap it to test tap handler.',
+      // 1. Pre-flight Checks
+      debugPrint('\n=== NOTIFICATION TEST STARTING ===');
+
+      // Check permissions first
+      final permManager = PermissionManager();
+      final permStatus = await permManager.checkAllPermissions();
+
+      details['📋 Initial Permission Status'] =
+          '''
+• Notifications: ${permStatus.notificationsGranted ? '✅' : '❌'}
+• Exact Alarms: ${permStatus.exactAlarmsGranted ? '✅' : '❌'}
+• Battery Optimized: ${permStatus.batteryOptimized ? '⚠️' : '✅'}''';
+
+      if (!permStatus.allGranted) {
+        debugPrint('⚠️ Not all permissions granted! Requesting...');
+        await permManager.requestAllPermissions();
+
+        // Handle battery optimization
+        if (permStatus.batteryOptimized) {
+          debugPrint('⚠️ Device is battery optimized. Opening settings...');
+          details['⚡ Battery Action'] = 'Opening battery settings...';
+          await permManager.openBatterySettings();
+          await Future.delayed(const Duration(seconds: 3));
+        }
+
+        // Handle exact alarms
+        if (!permStatus.exactAlarmsGranted) {
+          debugPrint('⚠️ Exact alarms not granted. Opening settings...');
+          details['⏰ Alarm Action'] = 'Opening alarm settings...';
+          await NativeAlarmManager.openAlarmSettings();
+          await Future.delayed(const Duration(seconds: 3));
+        }
+
+        // Final permission check
+        final finalStatus = await permManager.checkAllPermissions();
+        details['📋 Final Permission Status'] =
+            '''
+• Notifications: ${finalStatus.notificationsGranted ? '✅' : '❌'}
+• Exact Alarms: ${finalStatus.exactAlarmsGranted ? '✅' : '❌'}
+• Battery Optimized: ${finalStatus.batteryOptimized ? '⚠️' : '✅'}''';
+
+        if (!finalStatus.allGranted) {
+          error =
+              'Missing permissions: ${finalStatus.missingPermissions.join(", ")}';
+          passed = false;
+          details['❌ Error'] = error;
+          debugPrint('❌ ERROR: $error');
+          return;
+        }
+      }
+
+      // 2. Test Native Alarms
+      debugPrint('\n=== TESTING NATIVE ALARMS ===');
+
+      // Check if we can schedule
+      final canSchedule = await NativeAlarmManager.canScheduleExactAlarms();
+      details['✓ Can Schedule'] = canSchedule ? '✅ Yes' : '❌ No';
+
+      if (!canSchedule) {
+        error = 'Cannot schedule exact alarms - permission not granted';
+        passed = false;
+        details['❌ Error'] = error;
+        debugPrint('❌ ERROR: $error');
+        return;
+      }
+
+      // Create test notification with longer delay
+      final testNotif = NotificationItem(
+        id: 'native_test_${now.millisecondsSinceEpoch}',
+        title: '⚡ Native Alarm Test',
+        body:
+            'This notification was delivered using native Android alarms! 🎯\nTap to confirm receipt.',
         source: NotificationSource.user,
-        oneTimeDate: fireTime,
+        oneTimeDate: now.add(
+          const Duration(seconds: 30),
+        ), // Longer delay for stability
         createdAt: now,
       );
 
-      await manager.showNow(quickNotif);
-
-      details['⏰ Scheduled For'] =
-          '${fireTime.hour}:${fireTime.minute}:${fireTime.second}';
-      details['🕐 Current Time'] = '${now.hour}:${now.minute}:${now.second}';
-      details['⏱️ Delay'] = '5 seconds';
-      details['📋 Notification ID'] = quickNotif.id;
+      // Schedule it
+      debugPrint('Scheduling native alarm...');
+      try {
+        await manager.schedule(testNotif);
+        details['📝 Scheduling Result'] = '✅ Success';
+      } catch (e) {
+        error = 'Failed to schedule native alarm: $e';
+        passed = false;
+        details['❌ Error'] = error;
+        debugPrint('❌ ERROR: $error');
+        return;
+      }
 
       // Verify it's in the system
-      final pending = await manager.getPendingNotifications();
-      final found = pending.any((p) => p.id == quickNotif.id.hashCode);
+      final pendingAfter = await manager.getPendingNotifications();
+      final foundInSystem = pendingAfter.any(
+        (p) => p.id == testNotif.id.hashCode,
+      );
+      details['✓ Found in System'] = foundInSystem ? '✅ Yes' : '❌ No';
 
-      details['✓ In System'] = found ? '✅ Yes' : '❌ No';
-      details['💡 Instructions'] =
-          'Wait 5 seconds and tap the notification to test tap handler';
-
-      passed = found;
-
-      if (!passed) {
-        error = 'Notification was not scheduled in the system';
+      if (!foundInSystem) {
+        error = 'Alarm not found in system after scheduling';
+        passed = false;
+        details['❌ Error'] = error;
+        debugPrint('❌ ERROR: $error');
+        return;
       }
 
-      // Show countdown dialog
-      if (found) {
-        _showCountdownDialog(quickNotif.id);
-      }
-    } catch (e) {
-      // passed = false;
-      error = 'Exception: ${e.toString()}';
+      // Get native alarm info
+      final nativeAlarms = await NativeAlarmManager.getAllScheduledAlarms();
+      final nativeInfo = nativeAlarms.firstWhere(
+        (a) => a.id == testNotif.id.hashCode,
+        orElse: () => throw Exception('Alarm not found in native storage'),
+      );
+
+      details['📋 Native Alarm Info'] =
+          '''
+• ID: ${nativeInfo.id}
+• Title: ${nativeInfo.title}
+• Scheduled: ${nativeInfo.timestamp}''';
+
+      // Show guidance
+      details['ℹ️ Instructions'] = '''
+1. Wait 30 seconds for notification
+2. If notification appears, tap it
+3. Verify it appears in notification shade
+4. Check that tapping opens the app''';
+
+      _showCountdownDialog(testNotif.id);
+
+      debugPrint('\n=== TEST COMPLETED SUCCESSFULLY ===');
+      debugPrint('Now waiting for notification to fire...');
+    } catch (e, stack) {
+      passed = false;
+      error = 'Exception: ${e.toString()}\n$stack';
+      debugPrint('❌ CRITICAL ERROR: $e');
+      debugPrint('Stack trace: $stack');
     }
 
     stopwatch.stop();
     _addReport(
       TestReport(
-        name: '🚀 Quick Notification Test',
+        name: '🚀 Native Alarm Test',
         passed: passed,
         duration: stopwatch.elapsed,
         details: details,

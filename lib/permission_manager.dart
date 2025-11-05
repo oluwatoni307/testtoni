@@ -78,9 +78,22 @@ class PermissionManager {
   /// Check if battery optimization is enabled (restricts background work)
   Future<bool> _isBatteryOptimized() async {
     if (Platform.isAndroid) {
-      final status = await Permission.ignoreBatteryOptimizations.status;
-      // If granted, battery optimization is DISABLED (which is what we want)
-      return !status.isGranted;
+      try {
+        // Check battery optimization permission
+        final status = await Permission.ignoreBatteryOptimizations.status;
+        if (status.isGranted) {
+          debugPrint('✅ Battery optimization disabled via permission');
+          return false; // Not optimized
+        }
+
+        // If permission not granted, it's probably optimized
+        debugPrint('⚠️ Battery optimization enabled (no permission)');
+        return true;
+      } catch (e) {
+        debugPrint('Error checking battery optimization: $e');
+        // Assume optimized if we can't check
+        return true;
+      }
     }
     return false;
   }

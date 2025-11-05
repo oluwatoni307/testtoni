@@ -164,14 +164,14 @@ class NotificationManager {
     }
 
     // 🔍 DEBUG: Start of scheduling
-    int notificationId = item.id.hashCode;
+    int notificationId = item.id.hashCode.abs(); // Ensure positive ID
     debugPrint('');
     debugPrint('┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓');
     debugPrint('┃ SCHEDULING NOTIFICATION                         ┃');
     debugPrint('┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛');
     debugPrint('String ID: ${item.id}');
-    debugPrint('Int ID (hashCode): $notificationId');
-    debugPrint('HashCode is negative: ${notificationId < 0}');
+    debugPrint('Int ID (abs): $notificationId');
+    debugPrint('HashCode is negative: false');
     debugPrint('Title: ${item.title}');
     debugPrint('Body: ${item.body}');
     debugPrint('Source: ${item.source.name}');
@@ -285,7 +285,7 @@ class NotificationManager {
       debugPrint('  ✅ Time is valid, calling zonedSchedule...');
 
       await _plugin.zonedSchedule(
-        item.id.hashCode,
+        item.id.hashCode.abs(), // Ensure positive ID
         item.title,
         item.body,
         scheduled,
@@ -342,7 +342,7 @@ class NotificationManager {
       );
 
       await _plugin.zonedSchedule(
-        item.id.hashCode,
+        item.id.hashCode.abs(), // Ensure positive ID
         item.title,
         item.body,
         scheduled,
@@ -466,7 +466,7 @@ class NotificationManager {
 
   /// Internal cancel method
   Future<void> _cancelNotification(String id) async {
-    await _plugin.cancel(id.hashCode);
+    await _plugin.cancel(id.hashCode.abs()); // Ensure positive ID
   }
 
   // ============================================================================
