@@ -1,26 +1,28 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     
-    <!-- Exact alarms (Android 12+) - BOTH are needed! -->
+    <!-- Core notification permissions -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
+    
+    <!-- Exact alarm permissions (Android 12+) -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
     <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
     
-    <!-- Notifications (Android 13+) -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Boot persistence -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    
+    <!-- Wake from sleep -->
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
     
     <!-- Battery optimization -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
     
-    <!-- Reboot persistence - CRITICAL! -->
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
-    
-    <!-- Wake device from sleep for notifications -->
-    <uses-permission android:name="android.permission.WAKE_LOCK"/>
-    
-    <!-- Vibration for notifications -->
-    <uses-permission android:name="android.permission.VIBRATE"/>
-    
-    <!-- Internet (if using API sync) -->
+    <!-- Internet for API sync -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    
+    <!-- Foreground service (for critical operations) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
     
     <application
         android:label="test"
@@ -41,39 +43,40 @@
             
             <meta-data
               android:name="io.flutter.embedding.android.NormalTheme"
-              android:resource="@style/NormalTheme"
-              />
+              android:resource="@style/NormalTheme" />
             
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-            
-            <!-- Handle notification tap -->
-            <intent-filter>
-                <action android:name="FLUTTER_NOTIFICATION_CLICK"/>
-                <category android:name="android.intent.category.DEFAULT"/>
-            </intent-filter>
         </activity>
         
-        <!-- BOOT RECEIVER - Reschedule notifications after reboot -->
+        <!-- ═══════════════════════════════════════════════════════ -->
+        <!-- CRITICAL RECEIVERS - DO NOT MODIFY -->
+        <!-- ═══════════════════════════════════════════════════════ -->
+        
+        <!-- Alarm Receiver: Handles scheduled notifications -->
         <receiver 
-            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"
+            android:name=".alarm.AlarmReceiver"
             android:enabled="true"
-            android:exported="false">
+            android:exported="false"
+            android:directBootAware="true">
+        </receiver>
+        
+        <!-- Boot Receiver: Reschedules after device reboot -->
+        <receiver 
+            android:name=".alarm.BootReceiver"
+            android:enabled="true"
+            android:exported="false"
+            android:directBootAware="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED"/>
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
                 <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
                 <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
             </intent-filter>
         </receiver>
-        
-        <!-- NOTIFICATION RECEIVER - Handle scheduled notifications -->
-        <receiver 
-            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
-            android:enabled="true"
-            android:exported="false"/>
         
         <meta-data
             android:name="flutterEmbedding"

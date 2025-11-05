@@ -3,7 +3,7 @@ import 'package:workmanager/workmanager.dart';
 import 'dart:async';
 
 import 'dailly_sync.dart';
-import 'manager.dart';
+import 'not_manager.dart';
 import 'model.dart';
 import 'permission_manager.dart';
 import 'storage.dart';
