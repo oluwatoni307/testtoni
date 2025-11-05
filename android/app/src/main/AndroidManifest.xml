@@ -34,24 +34,25 @@
             </intent-filter>
         </activity>
 
-        <!-- ✅ Alarm Receiver -->
-        <receiver
-            android:name=".AlarmReceiver"
-            android:exported="false"
-            android:enabled="true"
-            android:directBootAware="true" />
+     <!-- ✅ Alarm Receiver -->
+<receiver
+    android:name=".alarm.AlarmReceiver"
+    android:exported="false"
+    android:enabled="true"
+    android:directBootAware="true" />
 
-        <!-- ✅ Optional: Boot receiver to reschedule alarms after reboot -->
-        <receiver
-            android:name=".BootReceiver"
-            android:enabled="true"
-            android:exported="false"
-            android:directBootAware="true">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
-            </intent-filter>
-        </receiver>
+<!-- ✅ Boot receiver -->
+<receiver
+    android:name=".alarm.BootReceiver"
+    android:enabled="true"
+    android:exported="false"
+    android:directBootAware="true">
+    <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+        <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+    </intent-filter>
+</receiver>
+
 
         <meta-data
             android:name="flutterEmbedding"
