@@ -1,58 +1,75 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:timezone/data/latest_all.dart' as tz;
+import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest.dart' as tzdata;
 
+/// Handles all notification setup and scheduling.
 class NotificationService {
-  // Singleton pattern
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
   NotificationService._internal();
 
-  late final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin;
-  bool _initialized = false;
+  late final FlutterLocalNotificationsPlugin _local;
 
-  // 🔧 Initialize plugin and timezones
+  /// Initialize notifications and timezone data.
   Future<void> initialize({Function(String?)? onNotificationTap}) async {
-    if (_initialized) return;
+    tzdata.initializeTimeZones();
 
-    flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+    _local = FlutterLocalNotificationsPlugin();
 
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-    final initSettings = InitializationSettings(android: androidInit);
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
+    final initSettings = InitializationSettings(android: androidSettings);
 
-    await flutterLocalNotificationsPlugin.initialize(
+    await _local.initialize(
       initSettings,
       onDidReceiveNotificationResponse: (response) {
         onNotificationTap?.call(response.payload);
       },
     );
 
-    // Initialize timezone database (important for schedule accuracy)
-    tz.initializeTimeZones();
-    tz.setLocalLocation(tz.local);
-
-    _initialized = true;
-    print('✅ NotificationService initialized');
+    debugPrint('✅ NotificationService initialized.');
   }
 
-  // ⚡ Show instant (immediate) notification
+  /// Request exact alarm permission (Android 13+).
+  Future<bool> ensureExactAlarmPermission() async {
+    final status = await Permission.scheduleExactAlarm.status;
+
+    if (status.isGranted) {
+      debugPrint('✅ Exact alarm permission already granted.');
+      return true;
+    }
+
+    final result = await Permission.scheduleExactAlarm.request();
+    if (result.isGranted) {
+      debugPrint('✅ Exact alarm permission granted by user.');
+      return true;
+    }
+
+    debugPrint('⚠️ Exact alarm permission denied.');
+    await openAppSettings();
+    return false;
+  }
+
+  /// Show a notification immediately.
   Future<void> showInstantNotification({
     required String title,
     required String body,
     String? payload,
   }) async {
-    const androidDetails = AndroidNotificationDetails(
-      'instant_channel_id',
-      'Instant Notifications',
-      channelDescription: 'Channel for immediate notifications',
-      importance: Importance.max,
-      priority: Priority.high,
+    const details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        'instant_channel',
+        'Instant Notifications',
+        importance: Importance.max,
+        priority: Priority.high,
+      ),
     );
 
-    final details = NotificationDetails(android: androidDetails);
-
-    await flutterLocalNotificationsPlugin.show(
-      DateTime.now().millisecondsSinceEpoch % 100000,
+    await _local.show(
+      DateTime.now().millisecondsSinceEpoch ~/ 1000,
       title,
       body,
       details,
@@ -60,41 +77,45 @@ class NotificationService {
     );
   }
 
-  // ⏰ Schedule notification for specific time
+  /// Schedule a notification at a specific time.
   Future<void> scheduleNotification({
+    required int id,
     required String title,
     required String body,
     required DateTime scheduledTime,
   }) async {
-    const androidDetails = AndroidNotificationDetails(
-      'scheduled_channel_id',
-      'Scheduled Notifications',
-      channelDescription: 'Channel for scheduled notifications',
-      importance: Importance.max,
-      priority: Priority.high,
-    );
+    final allowed = await ensureExactAlarmPermission();
+    if (!allowed) {
+      debugPrint(
+        '⛔ Cannot schedule notification — exact alarms not permitted.',
+      );
+      return;
+    }
 
-    final notificationDetails = NotificationDetails(android: androidDetails);
-
-    final tzTime = tz.TZDateTime.from(scheduledTime, tz.local);
-
-    await flutterLocalNotificationsPlugin.zonedSchedule(
-      scheduledTime.millisecondsSinceEpoch % 100000,
+    await _local.zonedSchedule(
+      id,
       title,
       body,
-      tzTime,
-      notificationDetails,
-      androidScheduleMode:
-          AndroidScheduleMode.exactAllowWhileIdle, // ✅ Required in v19.5.0+
-      matchDateTimeComponents: null,
+      tz.TZDateTime.from(scheduledTime, tz.local),
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'scheduled_channel',
+          'Scheduled Notifications',
+          importance: Importance.max,
+          priority: Priority.high,
+        ),
+      ),
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+
+      matchDateTimeComponents: DateTimeComponents.time,
     );
 
-    print('🕒 Scheduled → "$title" at $tzTime');
+    debugPrint('⏰ Scheduled "$title" at $scheduledTime');
   }
 
-  // 🚫 Cancel all scheduled notifications
+  /// Cancel all pending notifications.
   Future<void> cancelAll() async {
-    await flutterLocalNotificationsPlugin.cancelAll();
-    print('🧹 All notifications canceled');
+    await _local.cancelAll();
+    debugPrint('🧹 All notifications cancelled.');
   }
 }
