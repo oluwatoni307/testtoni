@@ -21,13 +21,8 @@ class AlarmStorage(context: Context) {
         private const val KEY_ALARMS = "alarms"
     }
     
-    data class AlarmData(
-        val id: Int,
-        val title: String,
-        val body: String,
-        val timestamp: Long,
-        val payload: String? = null
-    )
+    // Use the shared top-level AlarmData data class defined in AlarmData.kt
+    // (keeps a single canonical model for alarms across the module).
     
     /**
      * Save an alarm to storage

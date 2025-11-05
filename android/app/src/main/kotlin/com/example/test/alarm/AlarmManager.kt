@@ -22,7 +22,7 @@ class NativeAlarmManager(private val context: Context) {
             Logger.i("ℹ️ ┃ Title: $title")
             Logger.i("ℹ️ ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-            // Save alarm data
+            // Save alarm data (use the top-level AlarmData model)
             storage.saveAlarm(
                 AlarmData(
                     id = id,
@@ -32,7 +32,7 @@ class NativeAlarmManager(private val context: Context) {
                     payload = payload
                 )
             )
-            Logger.d("📘 Alarm saved: ID=$id, Total=${storage.getAlarms().size}")
+            Logger.d("📘 Alarm saved: ID=$id, Total=${storage.getAllAlarms().size}")
 
             // Create intent
             val intent = Intent(context, AlarmReceiver::class.java).apply {
@@ -89,7 +89,7 @@ class NativeAlarmManager(private val context: Context) {
 
             // Delete from storage
             storage.deleteAlarm(id)
-            Logger.d("📘 Alarm deleted: ID=$id, Remaining=${storage.getAlarms().size}")
+            Logger.d("📘 Alarm deleted: ID=$id, Remaining=${storage.getAllAlarms().size}")
             Logger.i("ℹ️ 🗑️ ALARM CANCELLED: ID=$id")
         } catch (e: Exception) {
             Logger.e("Failed to cancel alarm: ID=$id", e)
@@ -98,6 +98,6 @@ class NativeAlarmManager(private val context: Context) {
     }
 
     fun getScheduledAlarms(): List<AlarmData> {
-        return storage.getAlarms()
+        return storage.getAllAlarms()
     }
 }

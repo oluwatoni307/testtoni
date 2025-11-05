@@ -7,7 +7,9 @@ plugins {
 android {
     namespace = "com.example.test"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // Plugins require NDK 27.x; set explicit value to the highest required version
+    // (they are backward compatible). This avoids mismatch warnings during CI.
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         // ✅ Use Java 17 for modern plugins

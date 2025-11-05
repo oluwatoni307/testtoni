@@ -57,9 +57,9 @@ class AlarmScheduler(private val context: Context) {
                 }
             }
             
-            // Save alarm data to storage first
+            // Save alarm data to storage first (use top-level AlarmData model)
             storage.saveAlarm(
-                AlarmStorage.AlarmData(
+                AlarmData(
                     id = id,
                     title = title,
                     body = body,
@@ -172,7 +172,7 @@ class AlarmScheduler(private val context: Context) {
     /**
      * Get all scheduled alarms
      */
-    fun getAllScheduledAlarms(): List<AlarmStorage.AlarmData> {
+    fun getAllScheduledAlarms(): List<AlarmData> {
         return storage.getAllAlarms()
     }
     
