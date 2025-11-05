@@ -1,4 +1,4 @@
-package com.example.test
+package com.example.test.alarm
 
 import android.content.BroadcastReceiver
 import android.content.Context
