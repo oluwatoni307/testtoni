@@ -1,88 +1,60 @@
-<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.test">
 
-    <!-- ──────────────────────────────── -->
-    <!-- Core permissions                -->
-    <!-- ──────────────────────────────── -->
+    <!-- ✅ Core permissions -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.INTERNET" />
 
-    <!-- ──────────────────────────────── -->
-    <!-- Application declaration         -->
-    <!-- ──────────────────────────────── -->
     <application
         android:name="${applicationName}"
         android:label="test"
         android:icon="@mipmap/ic_launcher">
 
-        <!-- Main Flutter activity -->
+        <!-- ✅ Main Flutter Activity -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
-            android:theme="@style/LaunchTheme"
             android:taskAffinity=""
+            android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
-
-            <!-- Normal app theme -->
             <meta-data
                 android:name="io.flutter.embedding.android.NormalTheme"
                 android:resource="@style/NormalTheme" />
 
-            <!-- App entry point -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <!-- ──────────────────────────────── -->
-        <!-- flutter_local_notifications receivers -->
-        <!-- ──────────────────────────────── -->
-
-        <!-- Handles alarms for scheduled notifications -->
+        <!-- ✅ Alarm Receiver -->
         <receiver
-            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
-            android:exported="false" />
+            android:name=".AlarmReceiver"
+            android:exported="false"
+            android:enabled="true"
+            android:directBootAware="true" />
 
-        <!-- Reschedules alarms after reboot or package update -->
+        <!-- ✅ Optional: Boot receiver to reschedule alarms after reboot -->
         <receiver
-            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"
-            android:exported="true">
+            android:name=".BootReceiver"
+            android:enabled="true"
+            android:exported="false"
+            android:directBootAware="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
-                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
 
-        <!-- Optional: Handles notification taps while app is in background -->
-        <receiver
-            android:name="com.dexterous.flutterlocalnotifications.FlutterLocalNotificationsReceiver"
-            android:exported="false" />
-
-        <!-- Required by Flutter -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
-
     </application>
-
-    <!-- Optional: allow text-sharing intents for completeness -->
-    <queries>
-        <intent>
-            <action android:name="android.intent.action.PROCESS_TEXT" />
-            <data android:mimeType="text/plain" />
-        </intent>
-    </queries>
 </manifest>

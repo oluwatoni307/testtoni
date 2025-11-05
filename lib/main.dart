@@ -1,129 +1,120 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'my_notification_package.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:android_intent_plus/android_intent.dart';
+import 'package:android_intent_plus/flag.dart';
+import 'package:flutter/services.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  await NotificationService().initialize(
-    onNotificationTap: (payload) {
-      debugPrint('🔔 User tapped notification → $payload');
-    },
-  );
-
+  await requestAllPermissions();
   runApp(const MyApp());
 }
 
+/// Request all important Android permissions:
+/// - Notifications (Android 13+)
+/// - Exact alarms
+/// - Battery optimization exemption
+Future<void> requestAllPermissions() async {
+  if (!Platform.isAndroid) return;
+
+  // ✅ Ask for POST_NOTIFICATIONS (Android 13+)
+  if (await Permission.notification.isDenied) {
+    await Permission.notification.request();
+  }
+
+  // ✅ Request exact alarm permission (Android 13+)
+  try {
+    const platform = MethodChannel('alarm_channel');
+    final bool? granted = await platform.invokeMethod(
+      'checkExactAlarmPermission',
+    );
+    if (granted == false) {
+      final intent = AndroidIntent(
+        action: 'android.settings.REQUEST_SCHEDULE_EXACT_ALARM',
+        package: 'com.example.test', // <-- use your real package name
+      );
+      await intent.launch();
+    }
+  } catch (_) {
+    // fallback – ignore silently
+  }
+
+  // ✅ Request battery optimization disable
+  try {
+    final intent = AndroidIntent(
+      action: 'android.settings.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS',
+      data: 'package:com.example.test', // <-- use your real package name
+      flags: <int>[Flag.FLAG_ACTIVITY_NEW_TASK],
+    );
+    await intent.launch();
+  } catch (_) {
+    // ignore
+  }
+}
+
+/// Main App
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Notification Test',
-      theme: ThemeData(colorSchemeSeed: Colors.blue, useMaterial3: true),
-      home: const NotificationTester(),
+      title: 'Persistent Notifications',
+      theme: ThemeData(primarySwatch: Colors.blue),
+      home: const AlarmHome(),
     );
   }
 }
 
-class NotificationTester extends StatelessWidget {
-  const NotificationTester({super.key});
+/// Home Screen for testing alarms
+class AlarmHome extends StatefulWidget {
+  const AlarmHome({super.key});
+
+  @override
+  State<AlarmHome> createState() => _AlarmHomeState();
+}
+
+class _AlarmHomeState extends State<AlarmHome> {
+  static const platform = MethodChannel('alarm_channel');
+
+  Future<void> _scheduleAlarm(Duration delay, String label) async {
+    try {
+      await platform.invokeMethod('scheduleAlarm', {
+        'delaySeconds': delay.inSeconds,
+        'message': label,
+      });
+      debugPrint('⏰ Scheduled "$label" after ${delay.inMinutes} min');
+    } on PlatformException catch (e) {
+      debugPrint('❌ Failed to schedule: ${e.message}');
+    }
+  }
 
   Future<void> _scheduleAll() async {
-    final now = DateTime.now();
-    final notifier = NotificationService();
-
-    // 1 minute
-    await notifier.scheduleNotification(
-      id: 1,
-      title: '1 Minute Notification',
-      body: 'This fired after 1 minute!',
-      scheduledTime: now.add(const Duration(minutes: 1)),
-    );
-
-    // 5 minutes
-    await notifier.scheduleNotification(
-      id: 2,
-      title: '5 Minute Notification',
-      body: 'This fired after 5 minutes!',
-      scheduledTime: now.add(const Duration(minutes: 5)),
-    );
-
-    // 10 minutes
-    await notifier.scheduleNotification(
-      id: 3,
-      title: '10 Minute Notification',
-      body: 'This fired after 10 minutes!',
-      scheduledTime: now.add(const Duration(minutes: 10)),
-    );
-
-    // 1 hour
-    await notifier.scheduleNotification(
-      id: 4,
-      title: '1 Hour Notification',
-      body: 'This fired after 1 hour!',
-      scheduledTime: now.add(const Duration(hours: 1)),
-    );
-
-    // Schedule 6 PM and 8 PM
-    DateTime sixPm = DateTime(now.year, now.month, now.day, 18, 0);
-    DateTime eightPm = DateTime(now.year, now.month, now.day, 20, 0);
-    if (sixPm.isBefore(now)) sixPm = sixPm.add(const Duration(days: 1));
-    if (eightPm.isBefore(now)) eightPm = eightPm.add(const Duration(days: 1));
-
-    await notifier.scheduleNotification(
-      id: 5,
-      title: '6 PM Notification',
-      body: 'It’s 6 PM!',
-      scheduledTime: sixPm,
-    );
-
-    await notifier.scheduleNotification(
-      id: 6,
-      title: '8 PM Notification',
-      body: 'It’s 8 PM!',
-      scheduledTime: eightPm,
-    );
-
-    debugPrint('✅ All notifications scheduled successfully!');
+    await _scheduleAlarm(const Duration(minutes: 1), '1 Minute Alarm');
+    await _scheduleAlarm(const Duration(minutes: 5), '5 Minute Alarm');
+    await _scheduleAlarm(const Duration(minutes: 10), '10 Minute Alarm');
+    await _scheduleAlarm(const Duration(hours: 1), '1 Hour Alarm');
+    debugPrint('✅ All alarms scheduled.');
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Flutter Notifications Tester')),
+      appBar: AppBar(title: const Text('Persistent Alarm Test')),
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ElevatedButton.icon(
-              icon: const Icon(Icons.notifications_active),
-              label: const Text('Show Instant Notification'),
-              onPressed: () {
-                NotificationService().showInstantNotification(
-                  title: 'Hello!',
-                  body: 'This works even in background!',
-                  payload: 'demo_payload',
-                );
-              },
+            ElevatedButton(
+              onPressed: () =>
+                  _scheduleAlarm(const Duration(seconds: 5), 'Instant (5 sec)'),
+              child: const Text('Schedule 5s Alarm'),
             ),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.schedule),
-              label: const Text('Schedule All Notifications'),
+            const SizedBox(height: 10),
+            ElevatedButton(
               onPressed: _scheduleAll,
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.delete_forever),
-              label: const Text('Cancel All Notifications'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.redAccent,
-                foregroundColor: Colors.white,
-              ),
-              onPressed: () async {
-                await NotificationService().cancelAll();
-              },
+              child: const Text('Schedule All'),
             ),
           ],
         ),
