@@ -1,12 +1,11 @@
 package com.example.test
 
-import com.example.test.alarm.AlarmReceiver  // ✅ correct import
+import com.example.test.alarm.AlarmReceiver  // ✅ Import your receiver
+
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import android.content.Context
-import android.os.SystemClock
-import java.util.*
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.example.test/alarm"
@@ -19,17 +18,23 @@ class MainActivity : FlutterActivity() {
                 when (call.method) {
                     "scheduleAlarm" -> {
                         val title = call.argument<String>("title") ?: "Reminder"
-                        val message = call.argument<String>("message") ?: "Time to check!"
+                        val message = call.argument<String>("message") ?: "It's time!"
                         val delayMinutes = call.argument<Int>("delayMinutes") ?: 1
 
+                        // Calculate trigger time
                         val triggerAtMillis = System.currentTimeMillis() + delayMinutes * 60 * 1000
 
-                        // ✅ Create instance and schedule
-                        val receiver = AlarmReceiver()
-                        receiver.scheduleAlarm(applicationContext, triggerAtMillis, title, message)
+                        // Schedule the alarm using our Kotlin companion method
+                        AlarmReceiver.scheduleAlarm(
+                            applicationContext,
+                            triggerAtMillis,
+                            title,
+                            message
+                        )
 
                         result.success("Alarm set for +$delayMinutes minutes")
                     }
+
                     else -> result.notImplemented()
                 }
             }

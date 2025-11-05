@@ -12,9 +12,6 @@ void main() async {
 }
 
 /// Request all important Android permissions:
-/// - Notifications (Android 13+)
-/// - Exact alarms
-/// - Battery optimization exemption
 Future<void> requestAllPermissions() async {
   if (!Platform.isAndroid) return;
 
@@ -25,35 +22,24 @@ Future<void> requestAllPermissions() async {
 
   // ✅ Request exact alarm permission (Android 13+)
   try {
-    const platform = MethodChannel('alarm_channel');
-    final bool? granted = await platform.invokeMethod(
-      'checkExactAlarmPermission',
+    final intent = AndroidIntent(
+      action: 'android.settings.REQUEST_SCHEDULE_EXACT_ALARM',
+      package: 'com.example.test',
     );
-    if (granted == false) {
-      final intent = AndroidIntent(
-        action: 'android.settings.REQUEST_SCHEDULE_EXACT_ALARM',
-        package: 'com.example.test', // <-- use your real package name
-      );
-      await intent.launch();
-    }
-  } catch (_) {
-    // fallback – ignore silently
-  }
+    await intent.launch();
+  } catch (_) {}
 
   // ✅ Request battery optimization disable
   try {
     final intent = AndroidIntent(
       action: 'android.settings.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS',
-      data: 'package:com.example.test', // <-- use your real package name
+      data: 'package:com.example.test',
       flags: <int>[Flag.FLAG_ACTIVITY_NEW_TASK],
     );
     await intent.launch();
-  } catch (_) {
-    // ignore
-  }
+  } catch (_) {}
 }
 
-/// Main App
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -67,7 +53,6 @@ class MyApp extends StatelessWidget {
   }
 }
 
-/// Home Screen for testing alarms
 class AlarmHome extends StatefulWidget {
   const AlarmHome({super.key});
 
@@ -76,15 +61,17 @@ class AlarmHome extends StatefulWidget {
 }
 
 class _AlarmHomeState extends State<AlarmHome> {
-  static const platform = MethodChannel('alarm_channel');
+  // ✅ Match Kotlin’s channel name
+  static const platform = MethodChannel('com.example.test/alarm');
 
-  Future<void> _scheduleAlarm(Duration delay, String label) async {
+  Future<void> _scheduleAlarm(Duration delay, String title) async {
     try {
       await platform.invokeMethod('scheduleAlarm', {
-        'delaySeconds': delay.inSeconds,
-        'message': label,
+        'title': title,
+        'message': 'This is your reminder!',
+        'delayMinutes': delay.inMinutes,
       });
-      debugPrint('⏰ Scheduled "$label" after ${delay.inMinutes} min');
+      debugPrint('⏰ Scheduled "$title" after ${delay.inMinutes} min');
     } on PlatformException catch (e) {
       debugPrint('❌ Failed to schedule: ${e.message}');
     }
@@ -108,7 +95,7 @@ class _AlarmHomeState extends State<AlarmHome> {
           children: [
             ElevatedButton(
               onPressed: () =>
-                  _scheduleAlarm(const Duration(seconds: 5), 'Instant (5 sec)'),
+                  _scheduleAlarm(const Duration(seconds: 5), '5-second Alarm'),
               child: const Text('Schedule 5s Alarm'),
             ),
             const SizedBox(height: 10),
