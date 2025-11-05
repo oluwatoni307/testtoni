@@ -1,95 +1,58 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
-import 'dart:async';
-
+import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
-/// Handles initialization and all local notification operations.
 class NotificationService {
   // Singleton pattern
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
   NotificationService._internal();
 
-  // Plugin instance
-  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-      FlutterLocalNotificationsPlugin();
+  late final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin;
+  bool _initialized = false;
 
-  // Channel constants
-  static const AndroidNotificationChannel _mainChannel =
-      AndroidNotificationChannel(
-        'high_importance_channel',
-        'High Importance Notifications',
-        description: 'Used for important notifications.',
-        importance: Importance.high,
-        playSound: true,
-      );
-
-  /// Initialize notification plugin
+  // 🔧 Initialize plugin and timezones
   Future<void> initialize({Function(String?)? onNotificationTap}) async {
-    const AndroidInitializationSettings androidSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+    if (_initialized) return;
 
-    final InitializationSettings settings = InitializationSettings(
-      android: androidSettings,
-    );
+    flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
-    // Initialize plugin
+    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    final initSettings = InitializationSettings(android: androidInit);
+
     await flutterLocalNotificationsPlugin.initialize(
-      settings,
-      onDidReceiveNotificationResponse: (NotificationResponse response) {
-        if (response.payload != null && onNotificationTap != null) {
-          onNotificationTap(response.payload);
-        }
+      initSettings,
+      onDidReceiveNotificationResponse: (response) {
+        onNotificationTap?.call(response.payload);
       },
     );
 
-    // Create notification channel (Android 8+)
-    await flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >()
-        ?.createNotificationChannel(_mainChannel);
+    // Initialize timezone database (important for schedule accuracy)
+    tz.initializeTimeZones();
+    tz.setLocalLocation(tz.local);
 
-    // Request permissions (Android 13+)
-    await _requestAndroidPermission();
+    _initialized = true;
+    print('✅ NotificationService initialized');
   }
 
-  /// Ask user for notification permission on Android 13+
-  Future<void> _requestAndroidPermission() async {
-    final androidImplementation = flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >();
-
-    if (androidImplementation != null) {
-      final granted = await androidImplementation
-          .requestNotificationsPermission();
-      if (kDebugMode) {
-        debugPrint('🔔 Notification permission granted: $granted');
-      }
-    }
-  }
-
-  /// Show an instant notification
+  // ⚡ Show instant (immediate) notification
   Future<void> showInstantNotification({
     required String title,
     required String body,
     String? payload,
   }) async {
-    final details = NotificationDetails(
-      android: AndroidNotificationDetails(
-        _mainChannel.id,
-        _mainChannel.name,
-        channelDescription: _mainChannel.description,
-        importance: Importance.high,
-        priority: Priority.high,
-      ),
+    const androidDetails = AndroidNotificationDetails(
+      'instant_channel_id',
+      'Instant Notifications',
+      channelDescription: 'Channel for immediate notifications',
+      importance: Importance.max,
+      priority: Priority.high,
     );
 
+    final details = NotificationDetails(android: androidDetails);
+
     await flutterLocalNotificationsPlugin.show(
-      DateTime.now().millisecondsSinceEpoch.remainder(100000), // unique id
+      DateTime.now().millisecondsSinceEpoch % 100000,
       title,
       body,
       details,
@@ -97,42 +60,41 @@ class NotificationService {
     );
   }
 
-  /// Schedule a notification at a specific DateTime
+  // ⏰ Schedule notification for specific time
   Future<void> scheduleNotification({
     required String title,
     required String body,
     required DateTime scheduledTime,
-    String? payload,
   }) async {
-    final details = NotificationDetails(
-      android: AndroidNotificationDetails(
-        _mainChannel.id,
-        _mainChannel.name,
-        channelDescription: _mainChannel.description,
-        importance: Importance.high,
-        priority: Priority.high,
-      ),
+    const androidDetails = AndroidNotificationDetails(
+      'scheduled_channel_id',
+      'Scheduled Notifications',
+      channelDescription: 'Channel for scheduled notifications',
+      importance: Importance.max,
+      priority: Priority.high,
     );
+
+    final notificationDetails = NotificationDetails(android: androidDetails);
+
+    final tzTime = tz.TZDateTime.from(scheduledTime, tz.local);
 
     await flutterLocalNotificationsPlugin.zonedSchedule(
-      scheduledTime.millisecondsSinceEpoch.remainder(100000),
+      scheduledTime.millisecondsSinceEpoch % 100000,
       title,
       body,
-      // Note: Without timezone package, local time used directly
-      tz.TZDateTime.from(scheduledTime, tz.local),
-      details,
-      payload: payload,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      tzTime,
+      notificationDetails,
+      androidScheduleMode:
+          AndroidScheduleMode.exactAllowWhileIdle, // ✅ Required in v19.5.0+
+      matchDateTimeComponents: null,
     );
+
+    print('🕒 Scheduled → "$title" at $tzTime');
   }
 
-  /// Cancel a specific notification by ID
-  Future<void> cancelNotification(int id) async {
-    await flutterLocalNotificationsPlugin.cancel(id);
-  }
-
-  /// Cancel all active notifications
+  // 🚫 Cancel all scheduled notifications
   Future<void> cancelAll() async {
     await flutterLocalNotificationsPlugin.cancelAll();
+    print('🧹 All notifications canceled');
   }
 }
