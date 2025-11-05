@@ -62,6 +62,16 @@ class AlarmReceiver : BroadcastReceiver() {
                 alarmData.payload
             )
             
+            // Diagnostic: record that this alarm fired to SharedPreferences so
+            // we can verify delivery even if the notification is not visible.
+            try {
+                val prefs = context.getSharedPreferences("native_alarms_diag", Context.MODE_PRIVATE)
+                prefs.edit().putLong("last_alarm_timestamp", System.currentTimeMillis()).apply()
+                prefs.edit().putInt("last_alarm_id", alarmData.id).apply()
+            } catch (e: Exception) {
+                Logger.e("Failed to write diag prefs", e)
+            }
+
             // Clean up this alarm from storage (one-time alarms)
             storage.deleteAlarm(alarmId)
             

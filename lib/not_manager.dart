@@ -778,6 +778,48 @@ class NotificationManager {
 
   /// Get pending notifications (from flutter plugin)
   Future<List<PendingNotificationRequest>> getPendingNotifications() async {
+    // If using native backend, return native scheduled alarms mapped to
+    // PendingNotificationRequest so callers (tests/diagnostics) can
+    // compare `id`, `title`, and `body` uniformly.
+    if (_backend == SchedulingBackend.native) {
+      try {
+        final nativeAlarms = await NativeAlarmManager.getAllScheduledAlarms();
+        return nativeAlarms
+            .map(
+              (a) =>
+                  PendingNotificationRequest(a.id, a.title, a.body, a.payload),
+            )
+            .toList();
+      } catch (e) {
+        debugPrint('❌ Failed to fetch native alarms: $e');
+        return <PendingNotificationRequest>[];
+      }
+    }
+
+    // Hybrid backend: merge both sets (native + flutter) and dedupe by id
+    if (_backend == SchedulingBackend.hybrid) {
+      final flutterPending = await _plugin.pendingNotificationRequests();
+      final nativeAlarms = await NativeAlarmManager.getAllScheduledAlarms();
+
+      final mappedNative = nativeAlarms
+          .map(
+            (a) => PendingNotificationRequest(a.id, a.title, a.body, a.payload),
+          )
+          .toList();
+
+      // Merge and dedupe by id
+      final Map<int, PendingNotificationRequest> byId = {};
+      for (final p in flutterPending) {
+        byId[p.id] = p;
+      }
+      for (final p in mappedNative) {
+        byId[p.id] = p;
+      }
+
+      return byId.values.toList();
+    }
+
+    // Default: flutter backend
     return await _plugin.pendingNotificationRequests();
   }
 

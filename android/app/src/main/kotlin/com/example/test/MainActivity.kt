@@ -32,11 +32,34 @@ class MainActivity: FlutterActivity() {
                     "cancelAlarm" -> handleCancelAlarm(call.arguments, result)
                     "cancelAllAlarms" -> handleCancelAllAlarms(result)
                     "getAllScheduledAlarms" -> handleGetAllScheduledAlarms(result)
+                    "showTestNotification" -> handleShowTestNotification(call.arguments, result)
                     "canScheduleExactAlarms" -> handleCanScheduleExactAlarms(result)
                     "openAlarmSettings" -> handleOpenAlarmSettings(result)
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    /**
+     * Handle show test notification request from Flutter
+     * Arguments: map with title and body (optional)
+     */
+    private fun handleShowTestNotification(arguments: Any?, result: MethodChannel.Result) {
+        try {
+            val args = arguments as? Map<*, *>
+            val title = args?.get("title") as? String ?: "Test Notification"
+            val body = args?.get("body") as? String ?: "This is a test notification from native code"
+
+            // Use a high fixed ID for test notifications
+            val testId = 999999
+
+            // Show notification immediately
+            NotificationHelper(this).showNotification(testId, title, body, null)
+            result.success(true)
+        } catch (e: Exception) {
+            Logger.e("Error in handleShowTestNotification", e)
+            result.error("SHOW_TEST_ERROR", e.message, null)
+        }
     }
     
     /**

@@ -289,6 +289,7 @@ class _MyAppState extends State<MyApp> {
                             _TestButton('Settings', _testSettings),
                             _TestButton('Health Check', _testHealthCheck),
                             _TestButton('Quick Test', _testQuickNotification),
+                            _TestButton('Native Test', _testQuickNotification),
                           ],
                         ),
                       ],

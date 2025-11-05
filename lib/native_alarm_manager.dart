@@ -190,6 +190,26 @@ class NativeAlarmManager {
     }
   }
 
+  /// Show a native test notification immediately (uses NotificationHelper)
+  static Future<bool> showTestNotification({
+    String? title,
+    String? body,
+  }) async {
+    try {
+      final result = await platform.invokeMethod('showTestNotification', {
+        'title': title ?? 'Test Notification',
+        'body': body ?? 'This is a native test notification',
+      });
+      return result as bool;
+    } on PlatformException catch (e) {
+      debugPrint('❌ Platform exception in showTestNotification: ${e.message}');
+      return false;
+    } catch (e) {
+      debugPrint('❌ Error in showTestNotification: $e');
+      return false;
+    }
+  }
+
   /// Comprehensive health check
   static Future<NativeAlarmHealth> checkHealth() async {
     try {
