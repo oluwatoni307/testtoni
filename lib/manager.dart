@@ -348,7 +348,6 @@ class NotificationManager {
         scheduled,
         details,
         androidScheduleMode: AndroidScheduleMode.exact,
-        matchDateTimeComponents: DateTimeComponents.time, // Repeat daily
         payload: item.id,
       );
 
