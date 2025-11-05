@@ -1,5 +1,6 @@
 package com.example.test
 
+import com.example.test.alarm.AlarmReceiver  // ✅ correct import
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -22,7 +23,10 @@ class MainActivity : FlutterActivity() {
                         val delayMinutes = call.argument<Int>("delayMinutes") ?: 1
 
                         val triggerAtMillis = System.currentTimeMillis() + delayMinutes * 60 * 1000
-                        AlarmReceiver.scheduleAlarm(applicationContext, triggerAtMillis, title, message)
+
+                        // ✅ Create instance and schedule
+                        val receiver = AlarmReceiver()
+                        receiver.scheduleAlarm(applicationContext, triggerAtMillis, title, message)
 
                         result.success("Alarm set for +$delayMinutes minutes")
                     }
