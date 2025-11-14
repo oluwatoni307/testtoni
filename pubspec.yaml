@@ -30,6 +30,8 @@ environment:
 dependencies:
   app_settings: ^6.1.1
   device_info_plus: ^12.2.0
+  android_alarm_manager_plus: ^4.0.3
+
   flutter:
     sdk: flutter
   flutter_local_notifications: ^19.5.0
